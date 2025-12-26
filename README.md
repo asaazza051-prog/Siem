@@ -1,4 +1,4 @@
-# An-To-n-Th-ng-Tin
+# An toan thon tin kma
 SIEM
 # 🔒 Real-Time SIEM Alerting System for Small Businesses
 
@@ -10,13 +10,13 @@ SIEM
 ![VirusTotal](https://img.shields.io/badge/VirusTotal-API-red?style=flat)
 ![Telegram](https://img.shields.io/badge/Telegram-Bot-2CA5E0?style=flat&logo=telegram)
 
-### 📌 Mục tiêu dự án
+###  Mục tiêu dự án
 - Xây dựng hệ thống SIEM **realtime** phục vụ doanh nghiệp nhỏ (SME) với chi phí thấp.
 - Tự động phát hiện thay đổi file (FIM), giám sát bất thường và **cảnh báo tức thì** khi phát hiện mã độc.
 - Tích hợp **Threat Intelligence** (VirusTotal API) để đánh giá mức độ nguy hiểm.
 - Đáp ứng nhanh chóng (<15 giây) từ lúc sự kiện xảy ra đến khi nhận cảnh báo.
 
-### 🏗️ Kiến trúc hệ thống
+###  Kiến trúc hệ thống
 Wazuh Agents (Windows/Linux)
 ↓ (syslog + encrypted)
 Wazuh Server → Splunk (indexing & alerting)
