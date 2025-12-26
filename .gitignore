@@ -8,6 +8,7 @@ from flask import Flask, request, jsonify
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+import logging
 
 # Optional imports
 try:
@@ -19,21 +20,19 @@ try:
 except Exception:
     Counter = start_http_server = None
 
-# --- Config (inlined keys as requested) ---
-VT_API_KEY       ="<YOUR_VIRUSTOTAL_API_KEY>"
-TELEGRAM_TOKEN   = "<YOUR_TELEGRAM_BOT_TOKEN>"
-TELEGRAM_CHAT_ID = "<YOUR_CHAT_ID>"
-
+# --- Config (read from env; avoid inlining secrets) ---
+VT_API_KEY       = os.getenv("VT_API_KEY") or os.getenv("VIRUSTOTAL_API_KEY")
+TG_TOKEN         = os.getenv("TELEGRAM_TOKEN") or os.getenv("TG_TOKEN")
+TG_CHAT          = os.getenv("TELEGRAM_CHAT_ID") or os.getenv("TG_CHAT")
 HOST = socket.gethostname()
 PORT = int(os.getenv("PORT", "8080"))
 MIN_TG_INTERVAL = float(os.getenv("TG_MIN_INTERVAL", "2.0"))
 PROM_PORT = int(os.getenv("PROM_PORT", "9090"))
 
-# --- App & simple logging ---
+# --- App & logging ---
 app = Flask(__name__)
-import logging
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
-log = logging.getLogger("siem").info
+logger = logging.getLogger("siem")
 
 # --- HTTP session with retries ---
 s = requests.Session()
@@ -42,14 +41,14 @@ s.mount("https://", HTTPAdapter(max_retries=Retry(total=3, backoff_factor=0.5,
 REQUEST_TIMEOUT = 8
 
 # --- Executor + rate-limit ---
-execpool = ThreadPoolExecutor(max_workers=4)
+execpool = ThreadPoolExecutor(max_workers=int(os.getenv("MAX_WORKERS", "4")))
 _last = defaultdict(float)
 _lock = threading.Lock()
-def _key(msg): return hashlib.sha256(msg.encode()).hexdigest()[:12]
+def _key(msg): return hashlib.sha256(msg.encode("utf-8")).hexdigest()[:12]
 
 def send_telegram(msg, bg=True):
     if not (TG_TOKEN and TG_CHAT):
-        log("Telegram disabled: missing token/chat")
+        logger.info("Telegram disabled: missing token/chat")
         return
     k = _key(msg); now = time.time()
     with _lock:
@@ -58,18 +57,20 @@ def send_telegram(msg, bg=True):
         _last[k] = now
     def _post():
         try:
-            s.post(f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
+            r = s.post(f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
                    json={"chat_id":TG_CHAT,"text":msg,"parse_mode":"HTML","disable_web_page_preview":True},
-                   timeout=REQUEST_TIMEOUT).raise_for_status()
-        except Exception as e:
-            log(f"tg err: {e}")
+                   timeout=REQUEST_TIMEOUT)
+            r.raise_for_status()
+        except Exception:
+            logger.exception("tg err")
     if bg:
-        try: execpool.submit(_post)
-        except: _post()
+        try:
+            execpool.submit(_post)
+        except Exception:
+            _post()
     else:
         _post()
 
-# --- VirusTotal (cached) ---
 @lru_cache(maxsize=1024)
 def vt_scan(h):
     if not VT_API_KEY or not re.fullmatch(r"[A-Fa-f0-9]{32}|[A-Fa-f0-9]{64}", (h or "").strip()):
@@ -81,8 +82,8 @@ def vt_scan(h):
         stats = d.get("attributes", {}).get("last_analysis_stats", {})
         total = sum(stats.values()) if stats else 0
         return {"malicious": stats.get("malicious",0), "total": total, "link": f"https://www.virustotal.com/gui/file/{h}"}
-    except Exception as e:
-        log(f"vt err: {e}")
+    except Exception:
+        logger.exception("vt err")
         return None
 
 # --- Optional Prometheus metrics ---
@@ -93,7 +94,6 @@ if Counter and start_http_server:
 else:
     ALERT_COUNTER = VT_MAL_COUNTER = None
 
-# --- Helpers ---
 def local_time_str():
     if ZoneInfo:
         try:
@@ -105,6 +105,8 @@ def local_time_str():
 def safe(s): return html.escape(str(s or ""))
 
 def extract(result):
+    if not isinstance(result, dict):
+        return "unknown", "N/A", "THAY ĐỔI"
     for k in ("syscheck.path","syscheck_path","file_path","path"):
         if v := result.get(k):
             return v, _extract_hash(result), _extract_action(result)
@@ -127,7 +129,6 @@ def _extract_action(result):
     if "modified" in t or "integrity checksum changed" in t: return "SỬA ĐỔI"
     return "THAY ĐỔI"
 
-# --- Routes ---
 @app.post("/siem")
 def siem():
     p = request.get_json(force=True, silent=True)
@@ -150,8 +151,10 @@ def siem():
     return jsonify(status="ok")
 
 @app.get("/health")
-def health(): return jsonify(status="ok", hostname=HOST, vt=bool(VT_API_KEY), tg=bool(TG_TOKEN and TG_CHAT))
+def health():
+    return jsonify(status="ok", hostname=HOST, vt=bool(VT_API_KEY), tg=bool(TG_TOKEN and TG_CHAT))
 
 if __name__ == "__main__":
-    log("Starting compact SIEM webhook (keys inlined)")
+    logger.info("Starting compact SIEM webhook")
+    # For production use gunicorn: `gunicorn -w 4 -b 0.0.0.0:8080 siem:app`
     app.run(host="0.0.0.0", port=PORT, threaded=True)
