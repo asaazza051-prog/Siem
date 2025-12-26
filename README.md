@@ -1,4 +1,4 @@
-# An toan thon tin kma
+# An toan thong tin kma
 SIEM
 # 🔒 Real-Time SIEM Alerting System for Small Businesses
 
