@@ -54,6 +54,7 @@ docker build -t siem-webhook .
 docker run -d -p 8080:8080 --name siem-webhook --env-file .env siem-webhook
 
 # 4. Cấu hình Splunk Alert → Webhook URL: http://your-server:8080/siem
+### 
 📸 Demo minh họa
 Tạo file EICAR → Telegram báo ngay hash + link VirusTotal (65–71/71 engine phát hiện)
 Xóa/sửa file → Telegram báo hành động tương ứng
@@ -61,7 +62,7 @@ Xóa/sửa file → Telegram báo hành động tương ứng
 Giải pháp SIEM chi phí thấp, dễ triển khai cho doanh nghiệp nhỏ Việt Nam.
 Hỗ trợ cả Windows và Linux endpoint.
 Dễ mở rộng: thêm SOAR, dashboard Grafana, cloud deployment.
-👨‍💻 Tác giảDuong Cong Dinh – Sinh viên An Toàn Thông Tin
-📞 0344059683
+👨‍💻 Tác giả Duong Cong Dinh – Sinh viên An Toàn Thông Tin
+📞 0349159683
 📧 duongdinh242004@gmail.com
 🔗 LinkedIn | GitHub
