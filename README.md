@@ -2,55 +2,88 @@
 SIEM
 # 🔒 Real-Time SIEM Alerting System for Small Businesses
 
-**Xây dựng hệ thống giám sát và cảnh báo mã độc tự động thời gian thực cho doanh nghiệp nhỏ sử dụng nền tảng mã nguồn mở**
+**Hệ thống giám sát và cảnh báo mã độc tự động thời gian thực dành cho doanh nghiệp nhỏ sử dụng công cụ mã nguồn mở**
 
-![Wazuh](https://img.shields.io/badge/Wazuh-4.x-0078D4?style=flat&logo=wazuh)
-![Splunk](https://img.shields.io/badge/Splunk-9.x-000000?style=flat&logo=splunk)
-![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=flat&logo=python)
-![VirusTotal](https://img.shields.io/badge/VirusTotal-API-red?style=flat)
-![Telegram](https://img.shields.io/badge/Telegram-Bot-2CA5E0?style=flat&logo=telegram)
+## Mục tiêu dự án
+- Xây dựng hệ thống SIEM realtime với chi phí thấp cho doanh nghiệp nhỏ (SME).
+- Tự động phát hiện thay đổi file bất thường (FIM).
+- Tích hợp Threat Intelligence (VirusTotal API) để kiểm tra hash file.
+- Cảnh báo tức thì (< 15 giây) qua Telegram khi phát hiện mã độc.
 
-###  Mục tiêu dự án
-- Xây dựng hệ thống SIEM **realtime** phục vụ doanh nghiệp nhỏ (SME) với chi phí thấp.
-- Tự động phát hiện thay đổi file (FIM), giám sát bất thường và **cảnh báo tức thì** khi phát hiện mã độc.
-- Tích hợp **Threat Intelligence** (VirusTotal API) để đánh giá mức độ nguy hiểm.
-- Đáp ứng nhanh chóng (<15 giây) từ lúc sự kiện xảy ra đến khi nhận cảnh báo.
-
-###  Kiến trúc hệ thống
-Wazuh Agents (Windows/Linux)
-↓ (syslog + encrypted)
-Wazuh Server → Splunk (indexing & alerting)
+## Kiến trúc hệ thống
+Wazuh Agents (Windows/Linux endpoints)
+↓ (encrypted syslog)
+Wazuh Server → Splunk (indexing + realtime alert)
 ↓ (webhook POST JSON)
-Python Webhook → VirusTotal API (auto scan hash)
+Python Flask Webhook → VirusTotal API (scan hash)
 ↓
-Telegram Bot (realtime alerting)
-### 🚀 Tính năng chính
-- **Realtime File Integrity Monitoring (FIM)** – Phát hiện thêm/sửa/xóa file ngay lập tức.
-- **Automated Malware Detection** – Tự động query VirusTotal với hash file.
-- **Instant Alerting** – Gửi Telegram 2 tin:
-  1. Thông báo sự kiện (path, hash, host, thời gian)
-  2. Cảnh báo mã độc (số engine phát hiện + link VirusTotal)
-- **Mã nguồn mở 100%** – Không phụ thuộc tool thương mại.
+Telegram Bot → Admin nhận 2 tin nhắn:
 
-### ⚙️ Công nghệ sử dụng
-- **Wazuh 4.x** – Agent & Server (FIM, vuln detection, log collection)
-- **Splunk Free/Enterprise** – Central log storage & realtime search/alert
-- **Python 3.11 + Flask** – Webhook xử lý alert, tích hợp VT API
-- **VirusTotal API** – Threat intelligence tự động
+Sự kiện thay đổi file (path, hash, host, time)
+Kết quả VirusTotal (số engine phát hiện + link)
+
+text## 🚀 Tính năng chính
+- Realtime File Integrity Monitoring (FIM) bằng Wazuh
+- Tự động query VirusTotal khi phát hiện file mới/thay đổi
+- Cảnh báo tức thì qua Telegram (2 giai đoạn)
+- 100% mã nguồn mở, dễ mở rộng
+
+## ⚙️ Công nghệ sử dụng
+- **Wazuh 4.x** – Agent & Server (FIM, log collection)
+- **Splunk Free/Enterprise** – Central log storage & alerting
+- **Python 3.11 + Flask** – Webhook xử lý alert
+- **VirusTotal API** – Threat intelligence
 - **Telegram Bot** – Kênh cảnh báo realtime
 
-### 🛠️ Hướng dẫn chạy nhanh (Quick Start)
+## 🛠️ Hướng dẫn chạy nhanh (Quick Start)
+
+### 1. Prerequisites
+- Máy chủ Ubuntu/CentOS để cài Wazuh Server + Splunk
+- Splunk Free/Enterprise đã cài đặt và chạy
+- VirusTotal API key (free tại https://www.virustotal.com/)
+- Telegram Bot Token & Chat ID
+
+### 2. Clone repository
 ```bash
-# 1. Clone repo
-git clone https://github.com/duongcongdinh/siem-wazuh-splunk.git
-cd siem-wazuh-splunk
+git clone https://github.com/asaazza051-prog/Siem.git
+cd Siem
+3. Cấu hình Webhook
+Bashcp .env.example .env
+nano .env
+Điền các giá trị:
+VT_API_KEY=your_virustotal_api_key
+TELEGRAM_TOKEN=your_bot_token
+TELEGRAM_CHAT_ID=your_chat_id
+4. Chạy Webhook (Python trực tiếp hoặc Docker)
+Cách 1: Chạy trực tiếp (khuyến nghị dev)
+Bashpip install flask requests python-dotenv
+python webhook.py
+# Webhook sẽ chạy tại http://localhost:8080/siem
+5. Cài đặt & cấu hình Wazuh (tóm tắt quan trọng)
 
-# 2. Cấu hình environment variables
-cp .env.example .env
-# Edit .env: VT_API_KEY, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID
+Cài Wazuh All-in-one (hoặc riêng Server): https://documentation.wazuh.com/current/quickstart.html
+Cấu hình FIM trong /var/ossec/etc/ossec.conf trên Agent/Server:
 
-# 3. Deploy webhook (Docker khuyến nghị)
-docker build -t siem-webhook .
-docker run -d -p 8080:8080 --name siem-webhook --env-file .env siem-webhook
+XML<syscheck>
+  <directories realtime="yes" report_changes="yes">/path/to/monitor</directories>
+  <whodata>yes</whodata>
+</syscheck>
 
-# 4. Cấu hình Splunk Alert → Webhook URL: http://your-server:8080/siem
+Forward alert Wazuh đến Splunk 
+
+6. Cấu hình Splunk Alert → Webhook
+
+Vào Splunk → Search & Reporting
+Tạo saved search phát hiện FIM event (rule.id: 550-559 hoặc "File Integrity Monitoring")
+Tạo Alert → Trigger Actions → Webhook
+URL: http://your-webhook-server:8080/siem
+
+7. Test hệ thống
+
+Trên endpoint có Wazuh Agent: tạo/sửa file trong thư mục đang monitor
+Chờ <15 giây → nhận 2 tin Telegram.
+<img width="1001" height="451" alt="image" src="https://github.com/user-attachments/assets/ed4996f5-3633-4f5b-9608-181221069812" />
+<img width="804" height="624" alt="image" src="https://github.com/user-attachments/assets/4d6e3964-188c-4501-b891-1f14ba55a775" />
+
+
+
